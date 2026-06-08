@@ -121,11 +121,11 @@ function TimelineNode({ node, isLast }: { node: ApprovalNode; isLast: boolean })
 }
 
 export default function ApplicationDetail() {
-  const { appId } = useParams<{ appId: string }>()
+  const { id } = useParams<{ id: string }>()
   const getApplicationById = useGovStore((s) => s.getApplicationById)
   const supplementMaterials = useGovStore((s) => s.supplementMaterials)
 
-  const application = getApplicationById(appId!)
+  const application = getApplicationById(id!)
 
   if (!application) {
     return (

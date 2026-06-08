@@ -6,15 +6,15 @@ import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 
 export default function ServiceDetail() {
-  const { serviceId } = useParams<{ serviceId: string }>()
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const getServiceById = useGovStore((s) => s.getServiceById)
   const checkMaterials = useGovStore((s) => s.checkMaterials)
   const submitApplication = useGovStore((s) => s.submitApplication)
   const user = useAuthStore((s) => s.user)
 
-  const service = getServiceById(serviceId!)
-  const materialChecks = checkMaterials(serviceId!)
+  const service = getServiceById(id!)
+  const materialChecks = checkMaterials(id!)
 
   const [purpose, setPurpose] = useState('')
   const [submitting, setSubmitting] = useState(false)
