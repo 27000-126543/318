@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-gov-blue: #1E5AA8;
+  --color-gov-orange: #F59E0B;
+  --color-gov-bg: #F0F4F8;
+  --color-gov-green: #10B981;
+  --color-gov-red: #EF4444;
+  --color-gov-purple: #8B5CF6;
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 72px;
+  --header-height: 60px;
+  font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  body {
+    @apply bg-govBg text-gray-800 antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-serif font-semibold;
+  }
+}
+
+@layer components {
+  .gov-card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+  }
+
+  .gov-btn-primary {
+    @apply bg-govBlue text-white px-6 py-2.5 rounded-lg font-medium hover:bg-govBlue/90 transition-colors duration-200;
+  }
+
+  .gov-btn-secondary {
+    @apply bg-white text-govBlue border border-govBlue px-6 py-2.5 rounded-lg font-medium hover:bg-govBlue/5 transition-colors duration-200;
+  }
+
+  .gov-input {
+    @apply w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-govBlue/30 focus:border-govBlue transition-colors;
+  }
+
+  .gov-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}
