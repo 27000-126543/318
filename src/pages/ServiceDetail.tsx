@@ -34,8 +34,12 @@ export default function ServiceDetail() {
   const handleSubmit = () => {
     if (!user?.realNameVerified) return
     setSubmitting(true)
-    submitApplication(service.id, { purpose })
-    navigate('/applications')
+    const appId = submitApplication(service.id, { purpose })
+    if (appId) {
+      navigate(`/applications/${appId}`)
+    } else {
+      navigate('/applications')
+    }
   }
 
   return (

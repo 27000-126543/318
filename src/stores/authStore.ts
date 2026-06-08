@@ -28,12 +28,26 @@ interface AuthState {
   clearError: () => void
 }
 
+const DEMO_ACCOUNTS: Record<string, StoredUser> = {
+  '13888888888': { phone: '13888888888', password: '123456', name: '张三', realNameVerified: true },
+}
+
 function getUsers(): Record<string, StoredUser> {
   try {
     const data = localStorage.getItem('gov_users')
-    return data ? JSON.parse(data) : {}
+    let users: Record<string, StoredUser> = data ? JSON.parse(data) : {}
+    let needSave = false
+    for (const [phone, stored] of Object.entries(DEMO_ACCOUNTS)) {
+      if (!users[phone]) {
+        users[phone] = stored
+        needSave = true
+      }
+    }
+    if (needSave) saveUsers(users)
+    return users
   } catch {
-    return {}
+    saveUsers(DEMO_ACCOUNTS)
+    return { ...DEMO_ACCOUNTS }
   }
 }
 

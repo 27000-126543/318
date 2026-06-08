@@ -27,7 +27,7 @@ interface GovState {
   getRecommendedServices: () => ServiceItem[]
   getServiceById: (id: string) => ServiceItem | undefined
   checkMaterials: (serviceId: string) => { material: ServiceItem['requiredMaterials'][0]; hasCert: boolean }[]
-  submitApplication: (serviceId: string, formData: Record<string, string>) => void
+  submitApplication: (serviceId: string, formData: Record<string, string>) => string | null
   getApplicationById: (id: string) => Application | undefined
   supplementMaterials: (appId: string, materialIds: string[]) => void
 
@@ -123,7 +123,7 @@ export const useGovStore = create<GovState>((set, get) => ({
 
   submitApplication: (serviceId, formData) => {
     const service = get().getServiceById(serviceId)
-    if (!service) return
+    if (!service) return null
     const certs = get().certificates
     const materials = service.requiredMaterials.map((m) => ({
       materialId: m.id,
@@ -131,8 +131,9 @@ export const useGovStore = create<GovState>((set, get) => ({
       uploaded: m.fromCertificate ? certs.some((c) => c.type === m.fromCertificate && c.status === 'valid') : false,
     }))
     const now = new Date().toISOString()
+    const appId = `a${Date.now()}`
     const app: Application = {
-      id: `a${Date.now()}`,
+      id: appId,
       userId: '1',
       serviceId,
       serviceName: service.name,
@@ -153,6 +154,7 @@ export const useGovStore = create<GovState>((set, get) => ({
       saveToStorage({ ...state, applications })
       return { applications }
     })
+    return appId
   },
 
   getApplicationById: (id) => get().applications.find((a) => a.id === id),
