@@ -53,6 +53,7 @@ export interface Application {
   completedAt?: string
   approvalNodes: ApprovalNode[]
   materials: { materialId: string; name: string; uploaded: boolean }[]
+  actionRecords: ActionRecord[]
 }
 
 export interface ApprovalNode {
@@ -66,6 +67,16 @@ export interface ApprovalNode {
   comment?: string
   isTimeout: boolean
   timeoutHours: number
+}
+
+export interface ActionRecord {
+  id: string
+  action: 'submit' | 'approve' | 'reject' | 'return_supplement' | 'upload_material' | 'resubmit' | 'timeout_escalation' | 'finalize'
+  nodeName?: string
+  operator: string
+  comment?: string
+  materialName?: string
+  createdAt: string
 }
 
 export interface Hall {
@@ -126,6 +137,16 @@ export interface Evaluation {
   serviceName: string
   rating: number
   comment: string
+  createdAt: string
+}
+
+export interface Notification {
+  id: string
+  type: 'submitted' | 'supplement' | 'timeout' | 'approved' | 'rejected' | 'progress'
+  title: string
+  applicationId: string
+  serviceName: string
+  read: boolean
   createdAt: string
 }
 
@@ -294,7 +315,14 @@ export const mockApplications: Application[] = [
     materials: [{ materialId: 'm1-1', name: '身份证', uploaded: true }],
     approvalNodes: [
       { id: 'n1-1', nodeName: '初审', nodeOrder: 1, assignee: '李审批', status: 'approved', startedAt: '2026-05-20T09:30:00', completedAt: '2026-05-20T09:55:00', isTimeout: false, timeoutHours: 48 },
-      { id: 'n1-2', nodeName: '复核', nodeOrder: 2, assignee: '王复核', status: 'approved', startedAt: '2026-05-20T09:55:00', completedAt: '2026-05-20T10:15:00', isTimeout: false, timeoutHours: 48 },
+      { id: 'n1-2', nodeName: '复核', nodeOrder: 2, assignee: '王复核', status: 'approved', startedAt: '2026-05-20T09:55:00', completedAt: '2026-05-20T10:05:00', isTimeout: false, timeoutHours: 48 },
+      { id: 'n1-3', nodeName: '终审', nodeOrder: 3, assignee: '张终审', status: 'approved', startedAt: '2026-05-20T10:05:00', completedAt: '2026-05-20T10:15:00', isTimeout: false, timeoutHours: 72 },
+    ],
+    actionRecords: [
+      { id: 'ar1-1', action: 'submit', operator: '张三', createdAt: '2026-05-20T09:30:00' },
+      { id: 'ar1-2', action: 'approve', nodeName: '初审', operator: '李审批', createdAt: '2026-05-20T09:55:00' },
+      { id: 'ar1-3', action: 'approve', nodeName: '复核', operator: '王复核', createdAt: '2026-05-20T10:05:00' },
+      { id: 'ar1-4', action: 'finalize', nodeName: '终审', operator: '张终审', createdAt: '2026-05-20T10:15:00' },
     ],
   },
   {
@@ -306,6 +334,10 @@ export const mockApplications: Application[] = [
       { id: 'n2-2', nodeName: '复核', nodeOrder: 2, assignee: '钱复核', status: 'in_progress', startedAt: '2026-05-29T10:30:00', isTimeout: false, timeoutHours: 48 },
       { id: 'n2-3', nodeName: '终审', nodeOrder: 3, assignee: '孙终审', status: 'pending', isTimeout: false, timeoutHours: 72 },
     ],
+    actionRecords: [
+      { id: 'ar2-1', action: 'submit', operator: '张三', createdAt: '2026-05-28T14:20:00' },
+      { id: 'ar2-2', action: 'approve', nodeName: '初审', operator: '赵初审', createdAt: '2026-05-29T10:30:00' },
+    ],
   },
   {
     id: 'a3', userId: '1', serviceId: 's5', serviceName: '驾驶证换证', category: '交通服务', department: '公安局交通管理局',
@@ -316,6 +348,10 @@ export const mockApplications: Application[] = [
       { id: 'n3-2', nodeName: '复核', nodeOrder: 2, assignee: '吴复核', status: 'pending', isTimeout: false, timeoutHours: 48 },
       { id: 'n3-3', nodeName: '终审', nodeOrder: 3, assignee: '郑终审', status: 'pending', isTimeout: false, timeoutHours: 48 },
     ],
+    actionRecords: [
+      { id: 'ar3-1', action: 'submit', operator: '张三', createdAt: '2026-06-01T11:00:00' },
+      { id: 'ar3-2', action: 'timeout_escalation', nodeName: '初审', operator: '系统', comment: '初审已超48小时未处理，已升级通知主管', createdAt: '2026-06-03T11:00:00' },
+    ],
   },
   {
     id: 'a4', userId: '1', serviceId: 's7', serviceName: '医保报销', category: '医疗服务', department: '医疗保障局',
@@ -323,6 +359,28 @@ export const mockApplications: Application[] = [
     materials: [{ materialId: 'm7-1', name: '身份证', uploaded: true }, { materialId: 'm7-2', name: '社保卡', uploaded: true }, { materialId: 'm7-3', name: '医疗发票', uploaded: false }, { materialId: 'm7-4', name: '病历', uploaded: false }],
     approvalNodes: [
       { id: 'n4-1', nodeName: '初审', nodeOrder: 1, assignee: '陈初审', status: 'rejected', startedAt: '2026-05-25T16:45:00', completedAt: '2026-05-27T09:20:00', comment: '请补充医疗发票原件和住院病历', isTimeout: false, timeoutHours: 48 },
+      { id: 'n4-2', nodeName: '复核', nodeOrder: 2, assignee: '待分配', status: 'pending', isTimeout: false, timeoutHours: 48 },
+      { id: 'n4-3', nodeName: '终审', nodeOrder: 3, assignee: '待分配', status: 'pending', isTimeout: false, timeoutHours: 72 },
+    ],
+    actionRecords: [
+      { id: 'ar4-1', action: 'submit', operator: '张三', createdAt: '2026-05-25T16:45:00' },
+      { id: 'ar4-2', action: 'return_supplement', nodeName: '初审', operator: '陈初审', comment: '请补充医疗发票原件和住院病历', createdAt: '2026-05-27T09:20:00' },
+    ],
+  },
+  {
+    id: 'a5', userId: '1', serviceId: 's3', serviceName: '税务申报', category: '税务服务', department: '税务局',
+    status: 'approved', formData: { purpose: '年度汇算清缴' }, submittedAt: '2026-04-10T08:30:00', completedAt: '2026-04-15T16:00:00',
+    materials: [{ materialId: 'm3-1', name: '身份证', uploaded: true }, { materialId: 'm3-2', name: '收入证明', uploaded: true }],
+    approvalNodes: [
+      { id: 'n5-1', nodeName: '初审', nodeOrder: 1, assignee: '何初审', status: 'approved', startedAt: '2026-04-10T08:30:00', completedAt: '2026-04-11T14:00:00', isTimeout: false, timeoutHours: 48 },
+      { id: 'n5-2', nodeName: '复核', nodeOrder: 2, assignee: '吕复核', status: 'approved', startedAt: '2026-04-11T14:00:00', completedAt: '2026-04-13T10:00:00', isTimeout: false, timeoutHours: 48 },
+      { id: 'n5-3', nodeName: '终审', nodeOrder: 3, assignee: '施终审', status: 'approved', startedAt: '2026-04-13T10:00:00', completedAt: '2026-04-15T16:00:00', isTimeout: false, timeoutHours: 72 },
+    ],
+    actionRecords: [
+      { id: 'ar5-1', action: 'submit', operator: '张三', createdAt: '2026-04-10T08:30:00' },
+      { id: 'ar5-2', action: 'approve', nodeName: '初审', operator: '何初审', createdAt: '2026-04-11T14:00:00' },
+      { id: 'ar5-3', action: 'approve', nodeName: '复核', operator: '吕复核', createdAt: '2026-04-13T10:00:00' },
+      { id: 'ar5-4', action: 'finalize', nodeName: '终审', operator: '施终审', createdAt: '2026-04-15T16:00:00' },
     ],
   },
 ]

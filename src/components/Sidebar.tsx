@@ -8,6 +8,7 @@ import {
   Star,
   ShieldCheck,
   LayoutDashboard,
+  ClipboardCheck,
   ChevronLeft,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { label: '电子证照', path: '/e-licenses', icon: CreditCard },
   { label: '评价中心', path: '/evaluation', icon: Star },
   { label: '管理看板', path: '/admin/dashboard', icon: LayoutDashboard },
+  { label: '审批工作台', path: '/admin/approval', icon: ClipboardCheck },
 ]
 
 export default function Sidebar() {

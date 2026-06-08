@@ -18,6 +18,7 @@ import {
   AlertCircle,
   CheckCircle2,
   FileText,
+  Bell,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -107,7 +108,8 @@ function AnnouncementsCarousel() {
 
 export default function Home() {
   const { user } = useAuthStore()
-  const { applications, getRecommendedServices } = useGovStore()
+  const { applications, getRecommendedServices, notifications } = useGovStore()
+  const recentNotifications = notifications.filter((n) => !n.read).slice(0, 3)
   const recommended = getRecommendedServices()
 
   const activeApps = applications.filter((a) => a.status !== 'approved' && a.status !== 'rejected')
@@ -218,6 +220,31 @@ export default function Home() {
                 <span className={cn('gov-badge', statusColors[app.status])}>{statusLabels[app.status]}</span>
               </Link>
             ))}
+          </div>
+        </div>
+      )}
+
+      {recentNotifications.length > 0 && (
+        <div className="gov-card">
+          <div className="mb-4 flex items-center gap-2">
+            <Bell className="h-5 w-5 text-govRed" />
+            <h3 className="font-serif text-base font-semibold">最新通知</h3>
+          </div>
+          <div className="space-y-2">
+            {recentNotifications.map((n) => {
+              const statusMap: Record<string, string> = { submitted: 'first_review', progress: 're_review', supplement: 'supplement', timeout: 'timeout', approved: 'approved', rejected: 'rejected' }
+              const qs = statusMap[n.type] ? `?status=${statusMap[n.type]}` : ''
+              return (
+              <Link key={n.id} to={`/applications/${n.applicationId}${qs}`} className="flex items-center gap-3 rounded-lg border border-gray-100 p-3 transition-shadow hover:shadow-sm">
+                <div className={cn('h-2 w-2 rounded-full shrink-0', n.type === 'timeout' || n.type === 'rejected' ? 'bg-govRed' : n.type === 'supplement' ? 'bg-govOrange' : 'bg-govBlue')} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{n.title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{n.serviceName}</p>
+                </div>
+                <FileText className="h-4 w-4 text-gray-300 shrink-0" />
+              </Link>
+              )
+            })}
           </div>
         </div>
       )}

@@ -1,11 +1,12 @@
-import { useParams, Link } from 'react-router-dom'
+import { useState } from 'react'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, CheckCircle, XCircle, Circle, AlertCircle,
-  Clock, MessageSquare, Upload,
+  Clock, MessageSquare, Upload, Loader2,
 } from 'lucide-react'
 import { useGovStore } from '@/stores/govStore'
 import { cn } from '@/lib/utils'
-import type { ApprovalNode } from '@/lib/mockData'
+import type { ApprovalNode, ActionRecord } from '@/lib/mockData'
 
 const statusLabels: Record<string, string> = {
   submitted: '已提交',
@@ -29,6 +30,24 @@ const statusBadgeColors: Record<string, string> = {
   timeout: 'bg-govRed/10 text-govRed border-govRed/20',
 }
 
+const actionLabels: Record<ActionRecord['action'], string> = {
+  submit: '提交申请',
+  approve: '审批通过',
+  reject: '已驳回',
+  return_supplement: '退回补充',
+  upload_material: '上传材料',
+  resubmit: '重新提交',
+  timeout_escalation: '超时升级',
+  finalize: '办结',
+}
+
+function actionDotColor(action: ActionRecord['action']) {
+  if (action === 'approve' || action === 'finalize') return 'bg-govGreen'
+  if (action === 'return_supplement') return 'bg-govOrange'
+  if (action === 'reject' || action === 'timeout_escalation') return 'bg-govRed'
+  return 'bg-govBlue'
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('zh-CN', {
     year: 'numeric', month: '2-digit', day: '2-digit',
@@ -36,17 +55,9 @@ function formatDate(iso: string) {
   })
 }
 
-function getProgressPercent(app: ReturnType<typeof useGovStore.getState>['applications'][0]) {
-  const total = app.approvalNodes.length
-  if (total === 0) return 0
-  const completed = app.approvalNodes.filter(
-    (n) => n.status === 'approved' || n.status === 'rejected'
-  ).length
-  return Math.round((completed / total) * 100)
-}
-
 function TimelineNode({ node, isLast }: { node: ApprovalNode; isLast: boolean }) {
-  const isCompleted = node.status === 'approved' || node.status === 'rejected'
+  const isApproved = node.status === 'approved'
+  const isRejected = node.status === 'rejected'
   const isInProgress = node.status === 'in_progress'
   const isPending = node.status === 'pending'
   const isTimeout = node.isTimeout && isInProgress
@@ -54,9 +65,14 @@ function TimelineNode({ node, isLast }: { node: ApprovalNode; isLast: boolean })
   return (
     <div className="flex gap-4">
       <div className="flex flex-col items-center">
-        {isCompleted && (
+        {isApproved && (
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-govGreen shrink-0">
-            <CheckCircle className="h-4.5 w-4.5 text-white" />
+            <CheckCircle className="h-4 w-4 text-white" />
+          </div>
+        )}
+        {isRejected && (
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-govOrange shrink-0">
+            <XCircle className="h-4 w-4 text-white" />
           </div>
         )}
         {isInProgress && !isTimeout && (
@@ -66,7 +82,7 @@ function TimelineNode({ node, isLast }: { node: ApprovalNode; isLast: boolean })
         )}
         {isTimeout && (
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-govRed shrink-0 animate-pulse">
-            <AlertCircle className="h-4.5 w-4.5 text-white" />
+            <AlertCircle className="h-4 w-4 text-white" />
           </div>
         )}
         {isPending && (
@@ -77,7 +93,7 @@ function TimelineNode({ node, isLast }: { node: ApprovalNode; isLast: boolean })
         {!isLast && (
           <div className={cn(
             'w-0.5 flex-1 min-h-[2rem]',
-            isCompleted ? 'bg-govGreen' : 'bg-gray-200'
+            isApproved ? 'bg-govGreen' : isRejected ? 'bg-govOrange' : 'bg-gray-200'
           )} />
         )}
       </div>
@@ -85,35 +101,34 @@ function TimelineNode({ node, isLast }: { node: ApprovalNode; isLast: boolean })
       <div className={cn('flex-1 pb-6', isLast && 'pb-0')}>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold text-gray-800">{node.nodeName}</span>
-          {isCompleted && (
-            <span className="text-xs text-govGreen font-medium">
-              {node.status === 'approved' ? '已通过' : '已驳回'}
-            </span>
-          )}
-          {isInProgress && !isTimeout && (
-            <span className="text-xs text-govBlue font-medium">处理中</span>
-          )}
+          {isApproved && <span className="text-xs text-govGreen font-medium">已通过</span>}
+          {isRejected && <span className="text-xs text-govOrange font-medium">已驳回</span>}
+          {isInProgress && !isTimeout && <span className="text-xs text-govBlue font-medium">处理中</span>}
           {isTimeout && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-govRed/10 text-govRed border border-govRed/20">
               超时升级
             </span>
           )}
-          {isPending && (
-            <span className="text-xs text-gray-400">等待中</span>
-          )}
+          {isPending && <span className="text-xs text-gray-400">等待中</span>}
         </div>
         <p className="text-xs text-gray-500 mt-0.5">办理人：{node.assignee}</p>
         {node.completedAt && (
           <p className="text-xs text-gray-400 mt-0.5">
-            <Clock className="h-3 w-3 inline mr-1" />
-            {formatDate(node.completedAt)}
+            <Clock className="h-3 w-3 inline mr-1" />{formatDate(node.completedAt)}
           </p>
         )}
         {node.startedAt && !node.completedAt && (
           <p className="text-xs text-gray-400 mt-0.5">
-            <Clock className="h-3 w-3 inline mr-1" />
-            开始于 {formatDate(node.startedAt)}
+            <Clock className="h-3 w-3 inline mr-1" />开始于 {formatDate(node.startedAt)}
           </p>
+        )}
+        {isRejected && node.comment && (
+          <div className="mt-2 p-2 rounded-lg bg-govOrange/10 border border-govOrange/20">
+            <div className="flex items-start gap-1.5">
+              <MessageSquare className="h-3.5 w-3.5 text-govOrange shrink-0 mt-0.5" />
+              <p className="text-xs text-govOrange">{node.comment}</p>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -122,32 +137,55 @@ function TimelineNode({ node, isLast }: { node: ApprovalNode; isLast: boolean })
 
 export default function ApplicationDetail() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
   const getApplicationById = useGovStore((s) => s.getApplicationById)
   const supplementMaterials = useGovStore((s) => s.supplementMaterials)
+  const supplementSingleMaterial = useGovStore((s) => s.supplementSingleMaterial)
+  const [uploadingId, setUploadingId] = useState<string | null>(null)
 
   const application = getApplicationById(id!)
+  const backUrl = `/applications?${searchParams.toString()}`
 
   if (!application) {
     return (
       <div className="gov-card text-center py-16">
         <p className="text-gray-500">未找到该办件</p>
-        <Link to="/applications" className="gov-btn-secondary mt-4 inline-block">返回办件列表</Link>
+        <Link to={backUrl} className="gov-btn-secondary mt-4 inline-block">返回办件列表</Link>
       </div>
     )
   }
 
-  const progress = getProgressPercent(application)
-  const missingMaterialIds = application.materials
-    .filter((m) => !m.uploaded)
-    .map((m) => m.materialId)
+  const missingMaterials = application.materials.filter((m) => !m.uploaded)
+  const allUploaded = missingMaterials.length === 0
 
-  const handleSupplement = () => {
-    supplementMaterials(application.id, missingMaterialIds)
+  const handleUploadSingle = async (materialId: string) => {
+    setUploadingId(materialId)
+    await new Promise((r) => setTimeout(r, 800))
+    supplementSingleMaterial(application.id, materialId)
+    setUploadingId(null)
   }
+
+  const handleSubmitSupplement = () => {
+    const missingIds = application.materials.filter((m) => !m.uploaded).map((m) => m.materialId)
+    supplementMaterials(application.id, missingIds)
+  }
+
+  const completed = application.approvalNodes.filter(
+    (n) => n.status === 'approved' || n.status === 'rejected'
+  ).length
+  const progress = application.approvalNodes.length > 0
+    ? Math.round((completed / application.approvalNodes.length) * 100)
+    : 0
+
+  const commentNodes = application.approvalNodes.filter((n) => n.comment)
+
+  const sortedRecords = [...application.actionRecords].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  )
 
   return (
     <div>
-      <Link to="/applications" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-govBlue mb-4 transition-colors">
+      <Link to={backUrl} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-govBlue mb-4 transition-colors">
         <ArrowLeft className="h-4 w-4" />
         返回办件列表
       </Link>
@@ -159,23 +197,18 @@ export default function ApplicationDetail() {
             {statusLabels[application.status]}
           </span>
         </div>
-
         <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
           <span>{application.department}</span>
           <span className="text-gray-300">|</span>
           <span>提交于 {formatDate(application.submittedAt)}</span>
         </div>
-
         <div className="space-y-1">
           <div className="flex items-center justify-between text-xs text-gray-500">
             <span>办理进度</span>
             <span className="font-medium text-govBlue">{progress}%</span>
           </div>
           <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-govBlue transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
+            <div className="h-full rounded-full bg-govBlue transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
         </div>
       </div>
@@ -186,26 +219,58 @@ export default function ApplicationDetail() {
           {application.approvalNodes
             .sort((a, b) => a.nodeOrder - b.nodeOrder)
             .map((node, i) => (
-              <TimelineNode
-                key={node.id}
-                node={node}
-                isLast={i === application.approvalNodes.length - 1}
-              />
+              <TimelineNode key={node.id} node={node} isLast={i === application.approvalNodes.length - 1} />
             ))}
         </div>
       </div>
 
       <div className="gov-card mb-6">
+        <h2 className="font-serif text-lg font-semibold text-gray-800 mb-5">操作记录</h2>
+        {sortedRecords.length === 0 ? (
+          <p className="text-sm text-gray-400">暂无操作记录</p>
+        ) : (
+          <div className="space-y-4">
+            {sortedRecords.map((record, i) => (
+              <div key={record.id} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div className={cn('w-2.5 h-2.5 rounded-full shrink-0 mt-1.5', actionDotColor(record.action))} />
+                  {i < sortedRecords.length - 1 && <div className="w-0.5 flex-1 bg-gray-200 min-h-[1rem]" />}
+                </div>
+                <div className="flex-1 pb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-gray-800">{actionLabels[record.action]}</span>
+                    {record.nodeName && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{record.nodeName}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">操作人：{record.operator}</p>
+                  {record.materialName && (
+                    <p className="text-xs text-govBlue mt-0.5">材料：{record.materialName}</p>
+                  )}
+                  {record.comment && (
+                    <p className="text-xs text-gray-500 mt-1 bg-gray-50 rounded px-2 py-1">{record.comment}</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">{formatDate(record.createdAt)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className={cn(
+        'gov-card mb-6',
+        application.status === 'supplement' && 'border-govOrange/40 bg-govOrange/5'
+      )}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-serif text-lg font-semibold text-gray-800">申请材料</h2>
-          {application.status === 'supplement' && missingMaterialIds.length > 0 && (
-            <button onClick={handleSupplement} className="gov-btn-primary text-sm px-4 py-2 flex items-center gap-1.5">
+          {application.status === 'supplement' && allUploaded && (
+            <button onClick={handleSubmitSupplement} className="gov-btn-primary text-sm px-4 py-2 flex items-center gap-1.5">
               <Upload className="h-4 w-4" />
-              补充材料
+              提交补充材料
             </button>
           )}
         </div>
-
         <ul className="space-y-2">
           {application.materials.map((mat) => (
             <li key={mat.materialId} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
@@ -216,40 +281,47 @@ export default function ApplicationDetail() {
               )}
               <span className="text-sm text-gray-800">{mat.name}</span>
               <span className={cn(
-                'ml-auto text-xs px-1.5 py-0.5 rounded',
+                'text-xs px-1.5 py-0.5 rounded',
                 mat.uploaded ? 'bg-govGreen/10 text-govGreen' : 'bg-govRed/10 text-govRed'
               )}>
                 {mat.uploaded ? '已上传' : '缺失'}
               </span>
+              {!mat.uploaded && application.status === 'supplement' && (
+                <button
+                  onClick={() => handleUploadSingle(mat.materialId)}
+                  disabled={uploadingId === mat.materialId}
+                  className="ml-auto text-xs px-3 py-1 rounded-md bg-govOrange/10 text-govOrange border border-govOrange/20 hover:bg-govOrange/20 transition-colors disabled:opacity-50"
+                >
+                  {uploadingId === mat.materialId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '模拟上传'}
+                </button>
+              )}
             </li>
           ))}
         </ul>
       </div>
 
-      {application.approvalNodes.some((n) => n.comment) && (
-        <div className="gov-card">
-          <h2 className="font-serif text-lg font-semibold text-gray-800 mb-4">审批意见</h2>
+      <div className="gov-card">
+        <h2 className="font-serif text-lg font-semibold text-gray-800 mb-4">审批意见</h2>
+        {commentNodes.length === 0 ? (
+          <p className="text-sm text-gray-400">暂无审批意见</p>
+        ) : (
           <div className="space-y-3">
-            {application.approvalNodes
-              .filter((n) => n.comment)
-              .map((node) => (
-                <div key={node.id} className="flex gap-3 p-3 rounded-lg bg-gray-50">
-                  <MessageSquare className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" />
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-gray-800">{node.nodeName}</span>
-                      <span className="text-xs text-gray-400">{node.assignee}</span>
-                    </div>
-                    <p className="text-sm text-gray-600">{node.comment}</p>
-                    {node.completedAt && (
-                      <p className="text-xs text-gray-400 mt-1">{formatDate(node.completedAt)}</p>
-                    )}
+            {commentNodes.map((node) => (
+              <div key={node.id} className="flex gap-3 p-3 rounded-lg bg-gray-50">
+                <MessageSquare className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-800">{node.nodeName}</span>
+                    <span className="text-xs text-gray-400">{node.assignee}</span>
                   </div>
+                  <p className="text-sm text-gray-600">{node.comment}</p>
+                  {node.completedAt && <p className="text-xs text-gray-400 mt-1">{formatDate(node.completedAt)}</p>}
                 </div>
-              ))}
+              </div>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

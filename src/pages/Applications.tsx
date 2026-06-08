@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { FileText, Inbox } from 'lucide-react'
+import { useMemo, useCallback } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { FileText, Inbox, Search, RotateCcw, ChevronDown } from 'lucide-react'
 import { useGovStore } from '@/stores/govStore'
 import { cn } from '@/lib/utils'
 import type { Application } from '@/lib/mockData'
@@ -14,6 +14,18 @@ const tabs = [
 ] as const
 
 type TabKey = (typeof tabs)[number]['key']
+
+const statusOptions: { value: string; label: string }[] = [
+  { value: '', label: '全部' },
+  { value: 'submitted', label: '已提交' },
+  { value: 'first_review', label: '初审中' },
+  { value: 're_review', label: '复核中' },
+  { value: 'final_review', label: '终审中' },
+  { value: 'supplement', label: '待补充材料' },
+  { value: 'approved', label: '已通过' },
+  { value: 'rejected', label: '已驳回' },
+  { value: 'timeout', label: '已超时' },
+]
 
 const statusLabels: Record<Application['status'], string> = {
   submitted: '已提交',
@@ -39,13 +51,13 @@ const statusColors: Record<Application['status'], string> = {
 
 const processingStatuses: Application['status'][] = ['submitted', 'first_review', 're_review', 'final_review']
 
-function filterByTab(apps: Application[], tab: TabKey): Application[] {
-  if (tab === 'all') return apps
-  if (tab === 'processing') return apps.filter((a) => processingStatuses.includes(a.status))
-  if (tab === 'supplement') return apps.filter((a) => a.status === 'supplement')
-  if (tab === 'completed') return apps.filter((a) => a.status === 'approved')
-  if (tab === 'rejected') return apps.filter((a) => a.status === 'rejected' || a.status === 'timeout')
-  return apps
+function tabToStatuses(tab: TabKey): Application['status'][] | null {
+  if (tab === 'all') return null
+  if (tab === 'processing') return processingStatuses
+  if (tab === 'supplement') return ['supplement']
+  if (tab === 'completed') return ['approved']
+  if (tab === 'rejected') return ['rejected', 'timeout']
+  return null
 }
 
 function formatDate(iso: string) {
@@ -54,19 +66,151 @@ function formatDate(iso: string) {
 
 export default function Applications() {
   const applications = useGovStore((s) => s.applications)
-  const [activeTab, setActiveTab] = useState<TabKey>('all')
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const filtered = useMemo(() => filterByTab(applications, activeTab), [applications, activeTab])
+  const q = searchParams.get('q') || ''
+  const statusFilter = searchParams.get('status') || ''
+  const deptFilter = searchParams.get('dept') || ''
+  const dateFrom = searchParams.get('dateFrom') || ''
+  const dateTo = searchParams.get('dateTo') || ''
+  const tabParam = searchParams.get('tab') as TabKey | null
+  const activeTab: TabKey = tabs.some((t) => t.key === tabParam) ? tabParam! : 'all'
+
+  const departments = useMemo(() => {
+    const set = new Set(applications.map((a) => a.department))
+    return ['全部', ...Array.from(set).sort()]
+  }, [applications])
+
+  const updateParam = useCallback(
+    (key: string, value: string) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        if (value) next.set(key, value)
+        else next.delete(key)
+        return next
+      })
+    },
+    [setSearchParams]
+  )
+
+  const handleTabChange = useCallback(
+    (tab: TabKey) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('tab', tab)
+        next.delete('status')
+        return next
+      })
+    },
+    [setSearchParams]
+  )
+
+  const handleReset = useCallback(() => {
+    setSearchParams({})
+  }, [setSearchParams])
+
+  const filtered = useMemo(() => {
+    return applications.filter((app) => {
+      if (q && !app.serviceName.includes(q)) return false
+
+      const effectiveStatus = statusFilter
+      if (effectiveStatus && app.status !== effectiveStatus) return false
+
+      if (!statusFilter && activeTab !== 'all') {
+        const tabStatuses = tabToStatuses(activeTab)
+        if (tabStatuses && !tabStatuses.includes(app.status)) return false
+      }
+
+      if (deptFilter && deptFilter !== '全部' && app.department !== deptFilter) return false
+
+      if (dateFrom) {
+        const from = new Date(dateFrom)
+        const submitted = new Date(app.submittedAt)
+        if (submitted < from) return false
+      }
+      if (dateTo) {
+        const to = new Date(dateTo)
+        to.setHours(23, 59, 59, 999)
+        const submitted = new Date(app.submittedAt)
+        if (submitted > to) return false
+      }
+
+      return true
+    })
+  }, [applications, q, statusFilter, deptFilter, dateFrom, dateTo, activeTab])
 
   return (
     <div>
       <h1 className="font-serif text-2xl font-bold text-gray-800 mb-6">我的办件</h1>
 
-      <div className="flex gap-1 border-b border-gray-200 mb-6 overflow-x-auto">
+      <div className="gov-card mb-4 space-y-3">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              value={q}
+              onChange={(e) => updateParam('q', e.target.value)}
+              placeholder="搜索服务名称"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-govBlue/40 focus:border-govBlue/40"
+            />
+          </div>
+
+          <div className="relative min-w-[140px]">
+            <select
+              value={statusFilter}
+              onChange={(e) => updateParam('status', e.target.value)}
+              className="w-full appearance-none px-3 py-2 pr-8 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-govBlue/40 focus:border-govBlue/40 bg-white"
+            >
+              {statusOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          </div>
+
+          <div className="relative min-w-[160px]">
+            <select
+              value={deptFilter}
+              onChange={(e) => updateParam('dept', e.target.value)}
+              className="w-full appearance-none px-3 py-2 pr-8 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-govBlue/40 focus:border-govBlue/40 bg-white"
+            >
+              {departments.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          </div>
+
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => updateParam('dateFrom', e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-govBlue/40 focus:border-govBlue/40"
+          />
+          <span className="self-center text-gray-400 text-sm">至</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => updateParam('dateTo', e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-govBlue/40 focus:border-govBlue/40"
+          />
+
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-govBlue border border-gray-200 rounded-lg hover:border-govBlue/30 transition-colors"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            重置
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-1 border-b border-gray-200 mb-4 overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => handleTabChange(tab.key)}
             className={cn(
               'shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
               activeTab === tab.key
@@ -78,6 +222,8 @@ export default function Applications() {
           </button>
         ))}
       </div>
+
+      <p className="text-sm text-gray-500 mb-4">共 {filtered.length} 条记录</p>
 
       {filtered.length === 0 ? (
         <div className="gov-card text-center py-16">

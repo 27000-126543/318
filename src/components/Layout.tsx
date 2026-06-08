@@ -6,9 +6,6 @@ import {
   CreditCard,
   Calendar,
   Award,
-  Star,
-  LayoutDashboard,
-  Bell,
   Menu,
   User,
   LogOut,
@@ -17,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { useAppStore } from '@/stores/appStore'
 import Sidebar from '@/components/Sidebar'
+import NotificationBell from '@/components/NotificationBell'
 
 const mobileNavItems = [
   { label: '首页', path: '/', icon: Home },
@@ -28,7 +26,7 @@ const mobileNavItems = [
 
 export default function Layout() {
   const { user, logout } = useAuthStore()
-  const { sidebarCollapsed, unreadCount } = useAppStore()
+  const { sidebarCollapsed } = useAppStore()
   const location = useLocation()
 
   const isActive = (path: string) => {
@@ -54,14 +52,7 @@ export default function Layout() {
           <div className="hidden lg:block" />
 
           <div className="flex items-center gap-3">
-            <button className="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
-              <Bell className="h-5 w-5" />
-              {unreadCount() > 0 && (
-                <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-govRed px-1 text-[10px] font-bold text-white">
-                  {unreadCount() > 99 ? '99+' : unreadCount()}
-                </span>
-              )}
-            </button>
+            <NotificationBell />
 
             {user ? (
               <div className="flex items-center gap-2">

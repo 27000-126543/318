@@ -15,6 +15,7 @@ import ELicenses from '@/pages/ELicenses'
 import Evaluation from '@/pages/Evaluation'
 import Dashboard from '@/pages/admin/Dashboard'
 import Reports from '@/pages/admin/Reports'
+import ApprovalWorkbench from '@/pages/admin/ApprovalWorkbench'
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/e-licenses" element={<ELicenses />} />
           <Route path="/evaluation" element={<Evaluation />} />
           <Route path="/admin/dashboard" element={<Dashboard />} />
+          <Route path="/admin/approval" element={<ApprovalWorkbench />} />
           <Route path="/admin/reports" element={<Reports />} />
         </Route>
       </Routes>
